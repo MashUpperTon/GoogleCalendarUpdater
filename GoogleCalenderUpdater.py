@@ -16,12 +16,15 @@ deltaCutoff = 5
 
 def getConfig():
     f = open("config.txt","rt")
-    x = ast.literal_eval(f.read())
+    config = f.readlines()
+    x = ast.literal_eval(config[0])
+    global colours 
     global downloadURL
     global uniTimetableCalendarId
     global username
     global password
     global deltaCutoff
+    colours = ast.literal_eval(config[1])
     downloadURL = x["downloadURL"] 
     uniTimetableCalendarId = x["uniTimetableCalendarId"]
     username = x["username"]
@@ -36,14 +39,6 @@ def logIt(Message, type):
 def getUofGTimetable():
     newCalender = requests.get(downloadURL,auth=HTTPBasicAuth(username,password))
     return newCalender.text
-
-def readDownloadedUofGTimetable():
-    # Replace with getUofGTimetable when complete, this is just to stop
-    # me from spamming the servers during testing
-    f = open("newcalthree.txt","rt")
-    finish = f.read()
-    f.close()
-    return finish
 
 def getEvents(minTime):
     eventResults = (
@@ -62,19 +57,10 @@ def getEvents(minTime):
 
 def addEvent(title,description,location,start,end):
     logIt("New event added \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}".format(title,description,location,start,end),"INFO")
-    # Stupid elif block that uses regex to colourcode the events
     colourId = 1
-    if re.search("(?i)Engineering Mathematics 2",title): colourId = 11
-    elif re.search("(?i)Fluid Mechanics 2",title): colourId = 7
-    elif re.search("(?i)Mechanics of Structures 2A",title): colourId = 2
-    elif re.search("(?i)Electronic Design Project 2",title): colourId = 1
-    elif re.search("(?i)Power Electronics 2",title): colourId = 3
-    elif re.search("(?i)Introductory Programming 2",title): colourId = 6
-    elif re.search("(?i)Dynamics 2",title): colourId = 9
-    elif re.search("(?i)Analogue Electronics 2",title): colourId = 5
-    elif re.search("(?i)Embedded Processors 2",title): colourId = 10
-    elif re.search("(?i)Mechanical Design 2",title): colourId = 8
-    elif re.search("(?i)Design and Manufacture 2",title): colourId = 1
+    for colour in colours:
+        if re.search("(?i){}".format(colour),title):
+            colourId = colours[colour]
     # Convert werid ical VDDDType object to a python datetime object, then to a RFC 3339 (ISO 8601) formatted string
     start = start.dt.isoformat()
     end = end.dt.isoformat()
@@ -104,19 +90,10 @@ def deleteEvent(id):
 
 def editEvent(newTitle,newDescription,newLocation,newStart,newEnd,id):
     logIt("Event edited \n id = {}, \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}".format(id, newTitle,newDescription,newLocation,newStart,newEnd),"INFO")
-    # Stupid elif block that uses regex to colourcode the events
     colourId = 1
-    if re.search("(?i)Engineering Mathematics 2",newTitle): colourId = 11
-    elif re.search("(?i)Fluid Mechanics 2",newTitle): colourId = 7
-    elif re.search("(?i)Mechanics of Structures 2A",newTitle): colourId = 2
-    elif re.search("(?i)Electronic Design Project 2",newTitle): colourId = 1
-    elif re.search("(?i)Power Electronics 2",newTitle): colourId = 3
-    elif re.search("(?i)Introductory Programming 2",newTitle): colourId = 6
-    elif re.search("(?i)Dynamics 2",newTitle): colourId = 9
-    elif re.search("(?i)Analogue Electronics 2",newTitle): colourId = 5
-    elif re.search("(?i)Embedded Processors 2",newTitle): colourId = 10
-    elif re.search("(?i)Mechanical Design 2",newTitle): colourId = 8
-    elif re.search("(?i)Design and Manufacture 2",newTitle): colourId = 1
+    for colour in colours:
+        if re.search("(?i){}".format(colour),newTitle):
+            colourId = colours[colour]
     # Convert werid ical VDDDType object to a python datetime object, then to a RFC 3339 (ISO 8601) formatted string
     newStart = newStart.dt.isoformat()
     newEnd = newEnd.dt.isoformat()
