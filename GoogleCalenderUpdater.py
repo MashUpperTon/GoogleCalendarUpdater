@@ -12,7 +12,7 @@ from googleapiclient.errors import HttpError
 import datetime
 import os.path
 SCOPES = ["https://www.googleapis.com/auth/calendar"] # What permissions you grant this program from the Google Calendar API
-
+enableBatch = False # Testing varible that disables the batch requests, so that all the program does is output to log
 def getConfig(): # Read the config file that contains http url, password and username, gc calendar ID and the "delta cutoff", which determines at what point to edit an event or just delete it and make a new one
     f = open("config.txt","rt")
     config = f.readlines()
@@ -23,12 +23,14 @@ def getConfig(): # Read the config file that contains http url, password and use
     global username
     global password
     global deltaCutoff
+    global minTime
     colours = ast.literal_eval(config[1])
     downloadURL = x["downloadURL"] 
     uniTimetableCalendarId = x["uniTimetableCalendarId"]
     username = x["username"]
     password = x["password"]
     deltaCutoff = x["deltaCutoff"]
+    minTime = x["minTime"]
     f.close()
 def logIt(Message, type): # Log to "logcal.txt" and print to output
     f = open("logcal.txt","at")
@@ -55,11 +57,11 @@ def getEvents(minTime): # Get google calendar events starting from minTime
     return events
 
 def addEvent(title,description,location,start,end): # Add event to google calendar
-    logIt("New event added \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}".format(title,description,location,start,end),"INFO")
     colourId = 1 # Default value incase the below fails to find a colour
     for colour in colours:
         if re.search("(?i){}".format(colour),title):
             colourId = colours[colour]
+    logIt("New event added \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}, \n ColorId = {}".format(title,description,location,start,end,colourId),"INFO")
     # Convert werid ical VDDDType object to a python datetime object, then to a RFC 3339 (ISO 8601) formatted string
     start = start.dt.isoformat()
     end = end.dt.isoformat()
@@ -78,21 +80,21 @@ def addEvent(title,description,location,start,end): # Add event to google calend
         "colorId": colourId # sorry just wanted to confuse people with british spelling
     }
     # Add event addition to batch request
-    batch.add(service.events().insert(calendarId=uniTimetableCalendarId, body=eventBody))
+    if enableBatch: batch.add(service.events().insert(calendarId=uniTimetableCalendarId, body=eventBody))
 
 
 def deleteEvent(id): # Delete event from google calendar
     x = [y for y in EventsToBeRemoved if y["id"]==id] # List comprehension to find the Event with the correct id, in order to get its properties for logging
     x = x[0]
     logIt("Event Deleted \n Id = {}, \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}".format(id, x["summary"],x["description"],x["location"],x["start"]["dateTime"],x["end"]["dateTime"]),"INFO")
-    batch.add(service.events().delete(calendarId=uniTimetableCalendarId, eventId=id))
+    if enableBatch: batch.add(service.events().delete(calendarId=uniTimetableCalendarId, eventId=id))
 
 def editEvent(newTitle,newDescription,newLocation,newStart,newEnd,id): # Edit event in google calendar
-    logIt("Event edited \n id = {}, \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}".format(id, newTitle,newDescription,newLocation,newStart,newEnd),"INFO")
     colourId = 1 # Default value in case the below can't find a colour
     for colour in colours:
         if re.search("(?i){}".format(colour),newTitle):
             colourId = colours[colour]
+    logIt("Event edited \n id = {}, \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}, \n ColorId = {}".format(id, newTitle,newDescription,newLocation,newStart,newEnd, colourId),"INFO")
     # Convert werid ical VDDDType object to a python datetime object, then to a RFC 3339 (ISO 8601) formatted string
     newStart = newStart.dt.isoformat()
     newEnd = newEnd.dt.isoformat()
@@ -111,7 +113,7 @@ def editEvent(newTitle,newDescription,newLocation,newStart,newEnd,id): # Edit ev
         "colorId": colourId,
     }
     # Add event change to batch request
-    batch.add(service.events().update(calendarId=uniTimetableCalendarId, eventId=id, body=eventBody))
+    if enableBatch: batch.add(service.events().update(calendarId=uniTimetableCalendarId, eventId=id, body=eventBody))
 
 def setupCreds(): # Setup all da crededitialis mess, mostly copied from the python quickstart for the google calendar API 
     global creds 
@@ -161,7 +163,7 @@ if __name__ == "__main__": # Main function
         newcal = icalendar.Calendar.from_ical(newcalics) # Convert text ics into iCalendar object
         newcal = delMinTimeICS(newcal,"2026-09-20T18:07:16.736812+00:00" ) 
         oldcal = getEvents("2026-09-20T18:07:16.736812+00:00") # Last two lines delete events starting before 2026 adademic year TODO: change this so it's managed by the config file
-        batch = service.new_batch_http_request(callback=batchCallback) # Start batch request
+        if enableBatch: batch = service.new_batch_http_request(callback=batchCallback) # Start batch request
         EventsToBeAdded = newcal.copy()
         EventsToBeRemoved = oldcal.copy()
         # Removes all the events that are identical between the two calendars 
@@ -184,7 +186,7 @@ if __name__ == "__main__": # Main function
         # Adds remaining events
         for event in EventsToBeAdded:
             addEvent(event["SUMMARY"],event["DESCRIPTION"],event["LOCATION"],event["DTSTART"],event["DTEND"])
-        batch.execute() # Execute http batch request
+        if enableBatch: batch.execute() # Execute http batch request
         logIt("Finished!","INFO")
     except HttpError as error: # Called when the http request can't even go through
         logIt("Whoopsy Poopsy, a funny wunny error has occured! {}".format(error),"ERROR")
