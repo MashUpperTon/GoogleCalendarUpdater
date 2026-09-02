@@ -12,7 +12,7 @@ from googleapiclient.errors import HttpError
 import datetime
 import os.path
 SCOPES = ["https://www.googleapis.com/auth/calendar"] # What permissions you grant this program from the Google Calendar API
-enableBatch = False # Testing varible that disables the batch requests, so that all the program does is output to log
+enableBatch = True # Testing varible that disables the batch requests, so that all the program does is output to log
 def getConfig(): # Read the config file that contains http url, password and username, gc calendar ID and the "delta cutoff", which determines at what point to edit an event or just delete it and make a new one
     f = open("config.txt","rt")
     config = f.readlines()
