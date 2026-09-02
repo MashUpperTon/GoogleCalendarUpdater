@@ -1,0 +1,1 @@
+{"downloadURL" : "https://the_url_you_are_getting_your_ICS_file_from", "uniTimetableCalendarId" : "Id_Of_Google_calendar", "username" : "username_required_for_http_request","password" : "password_required_for_http_request","deltaCutoff" : "Some_number_that_acts_as_the_cutoff_for_how_many_fields_can_be_changed_before_a_new_event_is_created"}
