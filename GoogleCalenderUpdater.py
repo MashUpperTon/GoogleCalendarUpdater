@@ -161,8 +161,8 @@ if __name__ == "__main__": # Main function
         service = build("calendar","v3", credentials=creds) # Setup google calender api
         newcalics = getUofGTimetable() # get the latest timetable from UofG
         newcal = icalendar.Calendar.from_ical(newcalics) # Convert text ics into iCalendar object
-        newcal = delMinTimeICS(newcal,"2026-09-20T18:07:16.736812+00:00" ) 
-        oldcal = getEvents("2026-09-20T18:07:16.736812+00:00") # Last two lines delete events starting before 2026 adademic year TODO: change this so it's managed by the config file
+        newcal = delMinTimeICS(newcal, minTime) 
+        oldcal = getEvents(minTime) # Last two lines delete events starting before 2026 adademic year TODO: change this so it's managed by the config file
         if enableBatch: batch = service.new_batch_http_request(callback=batchCallback) # Start batch request
         EventsToBeAdded = newcal.copy()
         EventsToBeRemoved = oldcal.copy()
