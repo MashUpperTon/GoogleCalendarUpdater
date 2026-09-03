@@ -3,6 +3,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 import re
 import ast
+import os
 # Google calender API imports
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -14,7 +15,9 @@ import os.path
 SCOPES = ["https://www.googleapis.com/auth/calendar"] # What permissions you grant this program from the Google Calendar API
 enableBatch = True # Testing varible that disables the batch requests, so that all the program does is output to log
 def getConfig(): # Read the config file that contains http url, password and username, gc calendar ID and the "delta cutoff", which determines at what point to edit an event or just delete it and make a new one
-    f = open("config.txt","rt")
+    global pwd
+    pwd = os.path.dirname(os.path.realpath(__file__)) # Get the path of the current script
+    f = open(os.path.join(pwd, "config.txt"), "rt")
     config = f.readlines()
     x = ast.literal_eval(config[0])
     global colours 
@@ -33,7 +36,7 @@ def getConfig(): # Read the config file that contains http url, password and use
     minTime = x["minTime"]
     f.close()
 def logIt(Message, type): # Log to "logcal.txt" and print to output
-    f = open("logcal.txt","at")
+    f = open(os.path.join(pwd,"logcal.txt"),"at")
     f.write("{} [{}] {}\n".format(datetime.datetime.now(),type,Message))
     f.close()
     print(Message)
@@ -118,15 +121,15 @@ def editEvent(newTitle,newDescription,newLocation,newStart,newEnd,id): # Edit ev
 def setupCreds(): # Setup all da crededitialis mess, mostly copied from the python quickstart for the google calendar API 
     global creds 
     creds = None
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+    if os.path.exists(os.path.join(pwd, "token.json")):
+        creds = Credentials.from_authorized_user_file(os.path.join(pwd, "token.json"), SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json",SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(os.path.join(pwd, "credentials.json"), SCOPES)
             creds = flow.run_local_server(port=0)
-        with open("token.json","w") as token:
+        with open(os.path.join(pwd, "token.json"), "w") as token:
             token.write(creds.to_json())
 
 def batchCallback(request_id, response, exception): # Function that is called on completion (sucess or error) of http request to google calendar API
@@ -154,15 +157,15 @@ def calcDeltaICSGC(ICS,googlecalendar): # compare an ICS and google calendar eve
     return delta
 if __name__ == "__main__": # Main function
     # Setup variables and google api creds
-    setupCreds()
     getConfig()
+    setupCreds()
     try:
         logIt("Starting...", "INFO")
         service = build("calendar","v3", credentials=creds) # Setup google calender api
         newcalics = getUofGTimetable() # get the latest timetable from UofG
         newcal = icalendar.Calendar.from_ical(newcalics) # Convert text ics into iCalendar object
         newcal = delMinTimeICS(newcal, minTime) 
-        oldcal = getEvents(minTime) # Last two lines delete events starting before 2026 adademic year TODO: change this so it's managed by the config file
+        oldcal = getEvents(minTime) # Last two lines delete events starting before 2026 adademic year 
         if enableBatch: batch = service.new_batch_http_request(callback=batchCallback) # Start batch request
         EventsToBeAdded = newcal.copy()
         EventsToBeRemoved = oldcal.copy()
