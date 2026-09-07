@@ -16,10 +16,11 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"] # What permissions you gra
 enableBatch = True # Testing varible that disables the batch requests, so that all the program does is output to log
 def getConfig(): # Read the config file that contains http url, password and username, gc calendar ID and the "delta cutoff", which determines at what point to edit an event or just delete it and make a new one
     global pwd
-    pwd = os.path.dirname(os.path.realpath(__file__)) # Get the path of the current script
+    pwd = os.path.dirname(os.path.realpath(__file__)) # Gets the absolute path of the script, so that it can be ran from terminal with no bother
     f = open(os.path.join(pwd, "config.txt"), "rt")
     config = f.readlines()
     x = ast.literal_eval(config[0])
+    # defining all the global variables
     global colours 
     global downloadURL
     global uniTimetableCalendarId
@@ -93,11 +94,13 @@ def deleteEvent(id): # Delete event from google calendar
     if enableBatch: batch.add(service.events().delete(calendarId=uniTimetableCalendarId, eventId=id))
 
 def editEvent(newTitle,newDescription,newLocation,newStart,newEnd,id): # Edit event in google calendar
+    x = [y for y in EventsToBeRemoved if y["id"]==id] # List comprehension to find the Event with the correct id, in order to get its properties for logging
+    x = x[0]
     colourId = 1 # Default value in case the below can't find a colour
     for colour in colours:
         if re.search("(?i){}".format(colour),newTitle):
             colourId = colours[colour]
-    logIt("Event edited \n id = {}, \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}, \n ColorId = {}".format(id, newTitle,newDescription,newLocation,newStart,newEnd, colourId),"INFO")
+    logIt("Event edited \n id = {}, \n Title = {} -> {},\n Description = {} -> {},\n Location = {} -> {},\n Start = {} -> {},\n End = {} -> {}, \n ColorId = {}".format(id, x["summary"],newTitle,x["description"],newDescription,x["location"],newLocation,x["start"]["dateTime"],newStart,x["end"]["dateTime"],newEnd, colourId),"INFO")
     # Convert werid ical VDDDType object to a python datetime object, then to a RFC 3339 (ISO 8601) formatted string
     newStart = newStart.dt.isoformat()
     newEnd = newEnd.dt.isoformat()
