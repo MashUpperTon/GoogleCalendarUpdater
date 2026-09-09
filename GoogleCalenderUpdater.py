@@ -14,6 +14,7 @@ import datetime
 import os.path
 SCOPES = ["https://www.googleapis.com/auth/calendar"] # What permissions you grant this program from the Google Calendar API
 enableBatch = True # Testing varible that disables the batch requests, so that all the program does is output to log
+
 def getConfig(): # Read the config file that contains http url, password and username, gc calendar ID and the "delta cutoff", which determines at what point to edit an event or just delete it and make a new one
     global pwd
     pwd = os.path.dirname(os.path.realpath(__file__)) # Gets the absolute path of the script, so that it can be ran from terminal with no bother
@@ -36,11 +37,13 @@ def getConfig(): # Read the config file that contains http url, password and use
     deltaCutoff = x["deltaCutoff"]
     minTime = x["minTime"]
     f.close()
+
 def logIt(Message, type): # Log to "logcal.txt" and print to output
     f = open(os.path.join(pwd,"logcal.txt"),"at")
     f.write("{} [{}] {}\n".format(datetime.datetime.now(),type,Message))
     f.close()
     print(Message)
+
 def getUofGTimetable(): # Get ICS file from http server using Http basic authenticain
     newCalender = requests.get(downloadURL,auth=HTTPBasicAuth(username,password))
     return newCalender.text
@@ -94,7 +97,7 @@ def deleteEvent(id): # Delete event from google calendar
     if enableBatch: batch.add(service.events().delete(calendarId=uniTimetableCalendarId, eventId=id))
 
 def editEvent(newTitle,newDescription,newLocation,newStart,newEnd,id): # Edit event in google calendar
-    x = [y for y in EventsToBeRemoved if y["id"]==id] # List comprehension to find the Event with the correct id, in order to get its properties for logging
+    x = [y for y in oldcal if y["id"]==id] # List comprehension to find the Event with the correct id, in order to get its properties for logging
     x = x[0]
     colourId = 1 # Default value in case the below can't find a colour
     for colour in colours:
@@ -140,9 +143,11 @@ def batchCallback(request_id, response, exception): # Function that is called on
         logIt("Whoops! Request ID {} failed!!: {}".format(request_id,exception),"ERROR")
     else:
         logIt("Fan dabby dosie! Request ID {} went great! Response: {}".format(request_id, response),"INFO")
+
 def delMinTimeICS(events, minTime): # Get rid of events preceeding minTime from an ICS data block
     events = [event for event in events.events if event["DTSTART"].dt > datetime.datetime.fromisoformat(minTime)]
     return events
+
 def compareICSGC(ICS,googlecalendar): # compare an ICS and google calendar event to see if they are identical (in terms of title, description, location and start and stop time)
     if ICS["DTSTART"].dt != datetime.datetime.fromisoformat(googlecalendar["start"]["dateTime"]):return False
     elif ICS["DTEND"].dt != datetime.datetime.fromisoformat(googlecalendar["end"]["dateTime"]):return False
@@ -150,6 +155,7 @@ def compareICSGC(ICS,googlecalendar): # compare an ICS and google calendar event
     elif ICS["DESCRIPTION"] != googlecalendar["description"]:return False
     elif ICS["LOCATION"] != googlecalendar["location"]:return False
     else: return True 
+
 def calcDeltaICSGC(ICS,googlecalendar): # compare an ICS and google calendar event and calculate how different they are
     delta = 0
     if ICS["DTSTART"].dt != datetime.datetime.fromisoformat(googlecalendar["start"]["dateTime"]): delta = delta + 1
@@ -158,6 +164,14 @@ def calcDeltaICSGC(ICS,googlecalendar): # compare an ICS and google calendar eve
     if ICS["DESCRIPTION"] != googlecalendar["description"]: delta = delta + 1
     if ICS["LOCATION"] != googlecalendar["location"]: delta = delta + 1
     return delta
+
+def removeDuplicates(inputlist): # Removes duplicates from lists
+    outputlist = []
+    for x in inputlist:
+        if x not in outputlist:
+            outputlist.append(x)
+    return outputlist
+
 if __name__ == "__main__": # Main function
     # Setup variables and google api creds
     getConfig()
@@ -169,6 +183,8 @@ if __name__ == "__main__": # Main function
         newcal = icalendar.Calendar.from_ical(newcalics) # Convert text ics into iCalendar object
         newcal = delMinTimeICS(newcal, minTime) 
         oldcal = getEvents(minTime) # Last two lines delete events starting before 2026 adademic year 
+        newcal = removeDuplicates(newcal) # remove duplicates from both lists, just incase as they could ruin the nested for loops
+        oldcal = removeDuplicates(oldcal) 
         if enableBatch: batch = service.new_batch_http_request(callback=batchCallback) # Start batch request
         EventsToBeAdded = newcal.copy()
         EventsToBeRemoved = oldcal.copy()
@@ -178,7 +194,6 @@ if __name__ == "__main__": # Main function
                 if compareICSGC(newevent,oldevent):
                     EventsToBeAdded.remove(newevent)
                     EventsToBeRemoved.remove(oldevent)
-
         # Edits events with differences below deltaCutoff
         for removeEvent in EventsToBeRemoved:
             for addedEvent in EventsToBeAdded:
@@ -186,6 +201,7 @@ if __name__ == "__main__": # Main function
                     editEvent(addedEvent["SUMMARY"],addedEvent["DESCRIPTION"],addedEvent["LOCATION"],addedEvent["DTSTART"],addedEvent["DTEND"],removeEvent["id"])
                     EventsToBeAdded.remove(addedEvent)
                     EventsToBeRemoved.remove(removeEvent)
+                    break # Stops the inner loop from going again, possible causing it to attempt to remove the same event again, triggering an error
         # Removes remaining events
         for event in EventsToBeRemoved:
             deleteEvent(event["id"])
@@ -193,6 +209,11 @@ if __name__ == "__main__": # Main function
         for event in EventsToBeAdded:
             addEvent(event["SUMMARY"],event["DESCRIPTION"],event["LOCATION"],event["DTSTART"],event["DTEND"])
         if enableBatch: batch.execute() # Execute http batch request
-        logIt("Finished!","INFO")
     except HttpError as error: # Called when the http request can't even go through
+        logIt("HTTP Error! {}".format(error),"ERROR")
+        logIt("Stopped due to Error", "INFO")
+    except Exception as error:
         logIt("Whoopsy Poopsy, a funny wunny error has occured! {}".format(error),"ERROR")
+        logIt("Stopped due to Error", "INFO")
+    else:
+        logIt("Finished! With no errors!","INFO")
