@@ -64,10 +64,7 @@ def getEvents(minTime): # Get google calendar events starting from minTime
     return events
 
 def addEvent(title,description,location,start,end): # Add event to google calendar
-    colourId = 1 # Default value incase the below fails to find a colour
-    for colour in colours:
-        if re.search("(?i){}".format(colour),title):
-            colourId = colours[colour]
+    colourId = getSubjectColour(title)
     logIt("New event added \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}, \n ColorId = {}".format(title,description,location,start,end,colourId),"INFO")
     # Convert werid ical VDDDType object to a python datetime object, then to a RFC 3339 (ISO 8601) formatted string
     start = start.dt.isoformat()
@@ -89,7 +86,6 @@ def addEvent(title,description,location,start,end): # Add event to google calend
     # Add event addition to batch request
     if enableBatch: batch.add(service.events().insert(calendarId=uniTimetableCalendarId, body=eventBody))
 
-
 def deleteEvent(id): # Delete event from google calendar
     x = [y for y in EventsToBeRemoved if y["id"]==id] # List comprehension to find the Event with the correct id, in order to get its properties for logging
     x = x[0]
@@ -99,10 +95,7 @@ def deleteEvent(id): # Delete event from google calendar
 def editEvent(newTitle,newDescription,newLocation,newStart,newEnd,id): # Edit event in google calendar
     x = [y for y in oldcal if y["id"]==id] # List comprehension to find the Event with the correct id, in order to get its properties for logging
     x = x[0]
-    colourId = 1 # Default value in case the below can't find a colour
-    for colour in colours:
-        if re.search("(?i){}".format(colour),newTitle):
-            colourId = colours[colour]
+    colourId = getSubjectColour(newTitle)
     logIt("Event edited \n id = {}, \n Title = {} -> {},\n Description = {} -> {},\n Location = {} -> {},\n Start = {} -> {},\n End = {} -> {}, \n ColorId = {}".format(id, x["summary"],newTitle,x["description"],newDescription,x["location"],newLocation,x["start"]["dateTime"],newStart,x["end"]["dateTime"],newEnd, colourId),"INFO")
     # Convert werid ical VDDDType object to a python datetime object, then to a RFC 3339 (ISO 8601) formatted string
     newStart = newStart.dt.isoformat()
@@ -172,6 +165,13 @@ def removeDuplicates(inputlist): # Removes duplicates from lists
             outputlist.append(x)
     return outputlist
 
+def getSubjectColour(title):
+    colourId = 1 # Default value incase the below fails to find a colour
+    for colour in colours:
+        if re.search("(?i){}".format(colour),title):
+            colourId = colours[colour]
+    return colourId
+
 if __name__ == "__main__": # Main function
     # Setup variables and google api creds
     getConfig()
@@ -194,6 +194,7 @@ if __name__ == "__main__": # Main function
                 if compareICSGC(newevent,oldevent):
                     EventsToBeAdded.remove(newevent)
                     EventsToBeRemoved.remove(oldevent)
+                    break
         # Edits events with differences below deltaCutoff
         for removeEvent in EventsToBeRemoved:
             for addedEvent in EventsToBeAdded:
@@ -212,8 +213,8 @@ if __name__ == "__main__": # Main function
     except HttpError as error: # Called when the http request can't even go through
         logIt("HTTP Error! {}".format(error),"ERROR")
         logIt("Stopped due to Error", "INFO")
-    except Exception as error:
+    except Exception as error: # Called for any other error
         logIt("Whoopsy Poopsy, a funny wunny error has occured! {}".format(error),"ERROR")
         logIt("Stopped due to Error", "INFO")
-    else:
+    else: # Called if no errors are encountered
         logIt("Finished! With no errors!","INFO")
