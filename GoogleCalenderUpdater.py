@@ -14,7 +14,8 @@ import datetime
 import os.path
 SCOPES = ["https://www.googleapis.com/auth/calendar"] # What permissions you grant this program from the Google Calendar API
 enableBatch = True # Testing varible that disables the batch requests, so that all the program does is output to log
-
+def removeNewlines(string): # Remove \n from strings, makes the log files easier to read
+    return string.replace("\n"," \\n ")
 def getConfig(): # Read the config file that contains http url, password and username, gc calendar ID and the "delta cutoff", which determines at what point to edit an event or just delete it and make a new one
     global pwd
     pwd = os.path.dirname(os.path.realpath(__file__)) # Gets the absolute path of the script, so that it can be ran from terminal with no bother
@@ -65,7 +66,8 @@ def getEvents(minTime): # Get google calendar events starting from minTime
 
 def addEvent(title,description,location,start,end): # Add event to google calendar
     colourId = getSubjectColour(title)
-    logIt("New event added \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}, \n ColorId = {}".format(title,description,location,start,end,colourId),"INFO")
+    logDescription = removeNewlines(description)
+    logIt("New event added \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}, \n ColorId = {}".format(title,logDescription,location,start.dt.isoformat(),end.dt.isoformat(),colourId),"INFO")
     # Convert werid ical VDDDType object to a python datetime object, then to a RFC 3339 (ISO 8601) formatted string
     start = start.dt.isoformat()
     end = end.dt.isoformat()
@@ -89,17 +91,27 @@ def addEvent(title,description,location,start,end): # Add event to google calend
 def deleteEvent(id): # Delete event from google calendar
     x = [y for y in EventsToBeRemoved if y["id"]==id] # List comprehension to find the Event with the correct id, in order to get its properties for logging
     x = x[0]
-    logIt("Event Deleted \n Id = {}, \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}".format(id, x["summary"],x["description"],x["location"],x["start"]["dateTime"],x["end"]["dateTime"]),"INFO")
+    logDescription = removeNewlines(x["description"])
+    logIt("Event Deleted \n Id = {}, \n Title = {},\n Description = {},\n Location = {},\n Start = {},\n End = {}".format(id, x["summary"],logDescription,x["location"],x["start"]["dateTime"],x["end"]["dateTime"]),"INFO")
     if enableBatch: batch.add(service.events().delete(calendarId=uniTimetableCalendarId, eventId=id))
 
 def editEvent(newTitle,newDescription,newLocation,newStart,newEnd,id): # Edit event in google calendar
     x = [y for y in oldcal if y["id"]==id] # List comprehension to find the Event with the correct id, in order to get its properties for logging
     x = x[0]
     colourId = getSubjectColour(newTitle)
-    logIt("Event edited \n id = {}, \n Title = {} -> {},\n Description = {} -> {},\n Location = {} -> {},\n Start = {} -> {},\n End = {} -> {}, \n ColorId = {}".format(id, x["summary"],newTitle,x["description"],newDescription,x["location"],newLocation,x["start"]["dateTime"],newStart,x["end"]["dateTime"],newEnd, colourId),"INFO")
     # Convert werid ical VDDDType object to a python datetime object, then to a RFC 3339 (ISO 8601) formatted string
     newStart = newStart.dt.isoformat()
     newEnd = newEnd.dt.isoformat()
+    logDescription = removeNewlines(newDescription)
+    message = ["Event edited", "id ={}".format(id)]
+    if x["summary"] != newTitle: message.append("Title = {} -> {}".format(x["summary"],newTitle))
+    else: message.append("Title = {}".format(x["summary"]))
+    if x["description"] != newDescription: message.append("Description = {} -> {}".format(x["description"],logDescription))
+    elif x["location"] != newLocation: message.append("Location = {} -> {}".format(x["location"],newLocation))
+    elif x["start"]["dateTime"] != newStart: message.append("Start = {} -> {}".format(x["start"]["dateTime"],newStart))
+    elif x["end"]["dateTime"] != newEnd: message.append("End = {} -> {}".format(x["end"]["dateTime"],newEnd))
+    elif x["colorId"] != colourId: message.append("ColorId = {} -> {}".format(x["colorId"],colourId))
+    logIt("\n".join(message),"INFO")
     eventBody = {
         "summary": newTitle,
         "description": newDescription,
@@ -147,6 +159,7 @@ def compareICSGC(ICS,googlecalendar): # compare an ICS and google calendar event
     elif ICS["SUMMARY"] != googlecalendar["summary"]:return False
     elif ICS["DESCRIPTION"] != googlecalendar["description"]:return False
     elif ICS["LOCATION"] != googlecalendar["location"]:return False
+    elif getSubjectColour(ICS["SUMMARY"]) != int(googlecalendar["colorId"]):return False
     else: return True 
 
 def calcDeltaICSGC(ICS,googlecalendar): # compare an ICS and google calendar event and calculate how different they are
@@ -156,6 +169,7 @@ def calcDeltaICSGC(ICS,googlecalendar): # compare an ICS and google calendar eve
     if ICS["SUMMARY"] != googlecalendar["summary"]: delta = delta + 1
     if ICS["DESCRIPTION"] != googlecalendar["description"]: delta = delta + 1
     if ICS["LOCATION"] != googlecalendar["location"]: delta = delta + 1
+    if getSubjectColour(ICS["SUMMARY"]) != int(googlecalendar["colorId"]): delta = delta + 1
     return delta
 
 def removeDuplicates(inputlist): # Removes duplicates from lists
